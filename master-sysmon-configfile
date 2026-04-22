@@ -1,0 +1,138 @@
+<Sysmon schemaversion="4.90">
+<HashAlgorithms>md5,sha256</HashAlgorithms>
+<EventFiltering>
+<!-- ==================================================== -->
+<!-- USE CASE: Process Creation (Base Logging - REQUIRED) -->
+<!-- ==================================================== -->
+<ProcessCreate onmatch="include" />
+
+<!-- ============================================== -->
+<!-- USE CASE: Suspicious File Download (Temp/Downloads) -->
+<!-- ================================================== -->
+<FileCreate onmatch="include">
+  <TargetFilename condition="contains">\\Downloads\\</TargetFilename>
+  <TargetFilename condition="contains">\\Temp\\</TargetFilename>
+  <TargetFilename condition="end with">.exe</TargetFilename>
+</FileCreate>
+
+<FileCreateStreamHash onmatch="include">
+  <TargetFilename condition="contains">\\Downloads\\</TargetFilename>
+  <TargetFilename condition="contains">\\Temp\\</TargetFilename>
+</FileCreateStreamHash>
+
+<!-- ================================================ -->
+<!-- 🔹 USE CASE: Beaconing / Suspicious Network -->
+<!-- ===================================================== -->
+<NetworkConnect onmatch="include">
+  <Image condition="is not">C:\\Windows\\System32\\svchost.exe</Image>
+</NetworkConnect>
+
+<!-- ========================================== -->
+<!-- 🔹 USE CASE: Suspicious Archive Extraction -->
+<!-- ============================================== -->
+<RuleGroup name="Archive_Extraction" groupRelation="or">
+  <ProcessCreate onmatch="include">
+    <Image condition="end with">7z.exe</Image>
+    <Image condition="end with">winrar.exe</Image>
+    <Image condition="end with">winzip.exe</Image>
+    <Image condition="end with">tar.exe</Image>
+  </ProcessCreate>
+
+  <FileCreate onmatch="include">
+    <TargetFilename condition="contains">\\Temp\\</TargetFilename>
+    <TargetFilename condition="end with">.exe</TargetFilename>
+  </FileCreate>
+</RuleGroup>
+
+<!-- ================================================= -->
+<!-- 🔹 USE CASE: Unauthorized Configuration Change -->
+<!-- ============================================== -->
+<RegistryEvent onmatch="include">
+  <TargetObject condition="contains">Run</TargetObject>
+  <TargetObject condition="contains">Windows Defender</TargetObject>
+  <TargetObject condition="contains">Lsa</TargetObject>
+</RegistryEvent>
+
+<!-- =============================================== -->
+<!-- USE CASE: Anomalous File Deletion (Event ID 23) -->
+<!-- ================================================= -->
+<FileDelete onmatch="include">
+  <TargetFilename condition="contains">C:\\Users\\</TargetFilename>
+  <TargetFilename condition="contains">C:\\Temp</TargetFilename>
+</FileDelete>
+
+<!-- =============================================== -->
+<!-- 🔹 USE CASE: Privilege Escalation (PsExec Abuse) -->
+<!-- ================================================== -->
+<RuleGroup name="Privilege_Escalation" groupRelation="or">
+  <ProcessCreate onmatch="include">
+    <ParentImage condition="end with">PSEXESVC.exe</ParentImage>
+  </ProcessCreate>
+
+  <RegistryEvent onmatch="include">
+    <TargetObject condition="contains">PSEXESVC</TargetObject>
+  </RegistryEvent>
+</RuleGroup>
+
+<!-- ================================================ -->
+<!-- 🔹 USE CASE: Credential Dumping / LSASS Access -->
+<!-- ================================================ -->
+<ProcessAccess onmatch="include">
+  <TargetImage condition="end with">lsass.exe</TargetImage>
+</ProcessAccess>
+
+<ProcessCreate onmatch="include">
+  <Image condition="contains">mimikatz</Image>
+  <Image condition="contains">procdump</Image>
+</ProcessCreate>
+
+<!-- ============================================= -->
+<!-- 🔹 USE CASE: Suspicious PowerShell Execution -->
+<!-- ==================================================== -->
+<ProcessCreate onmatch="include">
+  <Image condition="end with">powershell.exe</Image>
+  <CommandLine condition="contains">-enc</CommandLine>
+</ProcessCreate>
+
+<ProcessCreate onmatch="include">
+  <Image condition="end with">powershell.exe</Image>
+  <CommandLine condition="contains">ExecutionPolicy Bypass</CommandLine>
+</ProcessCreate>
+
+<!-- ================================================== -->
+<!-- 🔹 USE CASE: VPN Usage Detection -->
+<!-- ================================================ -->
+<ProcessCreate onmatch="include">
+  <Image condition="contains">openvpn</Image>
+  <Image condition="contains">wireguard</Image>
+  <Image condition="contains">anyconnect</Image>
+</ProcessCreate>
+
+<!-- ============================================ -->
+<!-- 🔹 USE CASE: New Service Installation -->
+<!-- ============================================== -->
+<RegistryEvent onmatch="include">
+  <TargetObject condition="contains">CurrentControlSet\\Services</TargetObject>
+</RegistryEvent>
+
+<!-- =============================================== -->
+<!-- 🔹 USE CASE: Scheduled Task Persistence -->
+<!-- ============================================== -->
+<ProcessCreate onmatch="include">
+  <Image condition="end with">schtasks.exe</Image>
+  <CommandLine condition="contains">/create</CommandLine>
+</ProcessCreate>
+
+<!-- ============================================= -->
+<!-- 🔹 USE CASE: SMB Lateral Movement -->
+<!-- =============================================== -->
+<NetworkConnect onmatch="include">
+  <DestinationPort condition="is">445</DestinationPort>
+</NetworkConnect>
+
+<!-- ============================================== -->
+<!-- 🔹 EXTRA: DNS Logging (C2 Detection - Recommended) -->
+<!-- ============================================= -->
+<DnsQuery onmatch="include" />
+</EventFiltering>
+</Sysmon>
